@@ -1,3 +1,6 @@
 streamlit
 moviepy==1.0.3
 proglog
+imageio
+imageio-ffmpeg
+pillow
