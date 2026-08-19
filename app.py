@@ -1,6 +1,16 @@
 import streamlit as st
 import tempfile
 from moviepy.editor import VideoFileClip, ImageClip, CompositeVideoClip
+from PIL import Image
+# Linha de segurança para o erro do ANTIALIAS:
+Image.ANTIALIAS = Image.Resampling.LANCZOS
+
+st.set_page_config(page_title="Cortes Inteligentes", layout="wide")
+# ... (resto do seu código continua igual)
+
+import streamlit as st
+import tempfile
+from moviepy.editor import VideoFileClip, ImageClip, CompositeVideoClip
 
 st.set_page_config(page_title="Cortes Inteligentes", layout="wide")
 
