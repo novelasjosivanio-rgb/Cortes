@@ -2,56 +2,46 @@ import streamlit as st
 import tempfile
 from moviepy.editor import VideoFileClip, ImageClip, CompositeVideoClip
 
-st.set_page_config(page_title="Cortes 9:16", layout="wide")
+st.set_page_config(page_title="Cortes Inteligentes", layout="wide")
 
-st.title("✂️ Cortes Inteligentes (9:16 + 4:3)")
+st.title("✂️ Gerador de Cortes (9:16)")
 
-# Configurações na barra lateral
 video_file = st.sidebar.file_uploader("Vídeo principal", type=["mp4"])
 bg_image_file = st.sidebar.file_uploader("Imagem de fundo", type=["jpg", "png"])
 min_dur = st.sidebar.slider("Duração Mínima (s)", 20, 90, 20)
 max_dur = st.sidebar.slider("Duração Máxima (s)", 20, 90, 60)
 
-def generate_time_segments(duration, min_d, max_d):
+def process_video_cuts(video_path, bg_path, min_d, max_d):
+    video = VideoFileClip(video_path)
+    output_files = []
+    duration = video.duration
+    
+    # Criar segmentos de tempo
     segments = []
     current = 0.0
     while current < duration:
         d = min(max_d, duration - current)
         if d < min_d and segments:
-            last_start, _ = segments[-1]
-            segments[-1] = (last_start, duration)
+            segments[-1] = (segments[-1][0], duration)
             break
         segments.append((current, current + d))
         current += d
-    return segments
 
-def process_video_cuts(video_path, bg_path, segments):
-    video = VideoFileClip(video_path)
-    output_files = []
-    
-    # Define dimensões para 9:16 (Ex: 1080x1920)
-    target_w, target_h = 1080, 1920
-    
     for start, end in segments:
+        # Pega o subclip
         subclip = video.subclip(start, end)
         
-        # 1. Redimensionar vídeo para caber 4:3 na largura 1080
-        # 1080 / 4 * 3 = 810 de altura
+        # Redimensiona para largura de 1080px
+        # Usamos apply_to_mask=True para evitar erros com o frame
         subclip = subclip.resize(width=1080)
         
-        # 2. Criar Fundo 9:16
+        # Fundo 9:16
         if bg_path:
-            bg = ImageClip(bg_path).resize(newsize=(target_w, target_h))
+            bg = ImageClip(bg_path).resize(newsize=(1080, 1920))
             bg = bg.set_duration(subclip.duration)
+            final_clip = CompositeVideoClip([bg, subclip.set_position("center")])
         else:
-            bg = None # Ou pode criar um fundo preto aqui
-
-        # 3. Compor: Fundo + Vídeo centralizado
-        clips = [bg] if bg else []
-        subclip = subclip.set_position("center")
-        clips.append(subclip)
-        
-        final_clip = CompositeVideoClip(clips, size=(target_w, target_h))
+            final_clip = subclip
         
         out_filename = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4').name
         final_clip.write_videofile(out_filename, codec="libx264", audio_codec="aac", preset="ultrafast", logger=None)
@@ -69,14 +59,16 @@ if video_file and st.button("🚀 Processar"):
         bg_path = bg_tfile.name
         
     with st.spinner("Processando..."):
-        segments = generate_time_segments(VideoFileClip(tfile.name).duration, min_dur, max_dur)
-        clips = process_video_cuts(tfile.name, bg_path, segments)
-        st.session_state['clips'] = clips
-        st.success("Cortes prontos!")
+        try:
+            clips = process_video_cuts(tfile.name, bg_path, min_dur, max_dur)
+            st.session_state['clips'] = clips
+            st.success("Cortes prontos!")
+        except Exception as e:
+            st.error(f"Erro: {e}")
 
 if 'clips' in st.session_state:
     for idx, c in enumerate(st.session_state['clips']):
         st.video(c)
         with open(c, "rb") as f:
             st.download_button(f"Baixar Corte {idx+1}", f, f"corte_{idx+1}.mp4")
-            
+                          
