@@ -1,48 +1,69 @@
 import streamlit as st
-import tempfile
-from PIL import Image
+import google.generativeai as genai
+import os
 
-# Correção de compatibilidade para o Pillow moderno
-if not hasattr(Image, 'ANTIALIAS'):
-    Image.ANTIALIAS = Image.Resampling.LANCZOS
+st.set_page_config(page_title="IA de Cortes Inteligentes", layout="wide")
+st.title("🤖 IA Geradora de Cortes (100% Gratuita)")
 
-from moviepy.editor import VideoFileClip, ImageClip, CompositeVideoClip
+# Configuração da Chave da API do Gemini (Gratuita)
+# O usuário pode colocar a chave diretamente na barra lateral
+st.sidebar.header("Configuração da IA")
+api_key = st.sidebar.text_input("Cole sua Chave da API do Gemini", type="password")
 
-st.set_page_config(page_title="Gerador de Cortes", layout="wide")
-st.title("✂️ Gerador de Cortes (9:16)")
+st.markdown("""
+Esta ferramenta utiliza a Inteligência Artificial do Google para analisar vídeos e encontrar os momentos mais impactantes para cortes verticais (9:16).
+""")
 
-video_file = st.sidebar.file_uploader("Vídeo principal", type=["mp4"])
-bg_image_file = st.sidebar.file_uploader("Imagem de fundo", type=["jpg", "png"])
-min_dur = st.sidebar.slider("Duração Mínima (s)", 20, 90, 20)
-max_dur = st.sidebar.slider("Duração Máxima (s)", 20, 90, 60)
+video_file = st.sidebar.file_uploader("Envie seu vídeo", type=["mp4", "mov", "avi"])
 
-if video_file and st.button("🚀 Processar"):
-    tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
-    tfile.write(video_file.read())
+if video_file and api_key:
+    genai.configure(api_key=api_key)
     
-    with st.spinner("Processando o vídeo... Aguarde."):
-        try:
-            video = VideoFileClip(tfile.name)
-            subclip = video.subclip(0, min(max_dur, video.duration))
-            subclip = subclip.resize(width=1080)
-            
-            if bg_image_file:
-                bg_tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
-                bg_tfile.write(bg_image_file.read())
-                bg = ImageClip(bg_tfile.name).resize(newsize=(1080, 1920))
-                bg = bg.set_duration(subclip.duration)
-                final = CompositeVideoClip([bg, subclip.set_position("center")])
-            else:
-                final = subclip
+    # Salvar temporariamente o vídeo enviado
+    video_path = "temp_video.mp4"
+    with open(video_path, "wb") as f:
+        f.write(video_file.read())
+        
+    if st.button("✨ Analisar Vídeo com IA"):
+        with st.spinner("A IA está assistindo e analisando o seu vídeo... Isso pode levar alguns minutos."):
+            try:
+                st.info("Fazendo upload do vídeo para a nuvem da IA...")
+                uploaded_file = genai.upload_file(video_path)
                 
-            out_path = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4').name
-            final.write_videofile(out_path, codec="libx264", audio_codec="aac", logger=None)
-            
-            st.success("Corte gerado com sucesso!")
-            st.video(out_path)
-            with open(out_path, "rb") as f:
-                st.download_button("📥 Baixar Corte", f, "corte.mp4", mime="video/mp4")
+                # Aguardar o arquivo ficar pronto na API
+                while uploaded_file.state.name == "PROCESSING":
+                    import time
+                    time.sleep(5)
+                    uploaded_file = genai.get_file(uploaded_file.name)
                 
-        except Exception as e:
-            st.error(f"Erro no processamento: {e}")
-            
+                st.info("Gerando os melhores cortes com IA...")
+                model = genai.GenerativeModel("gemini-1.5-flash")
+                
+                prompt = (
+                    "Analise este vídeo e identifique os 3 melhores trechos (momentos mais interessantes, "
+                    "engraçados ou de maior impacto) para transformar em cortes verticais curtos (Reels/TikTok). "
+                    "Para cada corte, forneça o tempo de início e o tempo de término exatos em segundos, "
+                    "junto com uma justificativa curta."
+                )
+                
+                response = model.generate_content([uploaded_file, prompt])
+                
+                st.success("Análise concluída pela IA!")
+                st.markdown("### Sugestões de Cortes da IA:")
+                st.write(response.text)
+                
+            except Exception as e:
+                st.error(f"Ocorreu um erro na IA: {e}")
+            finally:
+                if os.path.exists(video_path):
+                    os.remove(video_path)
+elif not api_key:
+    st.warning("⚠️ Por favor, insira sua Chave da API do Gemini na barra lateral para continuar.")
+    st.markdown("""
+    **Como conseguir uma chave gratuita do Gemini (Google AI Studio):**
+    1. Acesse [aistudio.google.com](https://aistudio.google.com/) (gratuito).
+    2. Faça login com sua conta Google.
+    3. Clique em **"Get API key"** e crie sua chave gratuitamente.
+    4. Cole a chave no campo ao lado esquerdo.
+    """)
+                    
