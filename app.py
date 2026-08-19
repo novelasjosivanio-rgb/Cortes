@@ -2,11 +2,11 @@ import streamlit as st
 import tempfile
 import os
 
-# Correção de compatibilidade para o Pillow antes de importar o MoviePy
 from PIL import Image
 if not hasattr(Image, 'ANTIALIAS'):
     Image.ANTIALIAS = Image.Resampling.LANCZOS
 
+# IMPORTAÇÃO CORRETA DO MOVIEPY
 from moviepy.editor import VideoFileClip, ImageClip, CompositeVideoClip
 
 st.set_page_config(page_title="Gerador de Cortes", layout="wide")
@@ -24,7 +24,6 @@ if video_file and st.button("🚀 Processar"):
     with st.spinner("Processando..."):
         try:
             video = VideoFileClip(tfile.name)
-            # Logica simples de corte
             subclip = video.subclip(0, min(max_dur, video.duration))
             subclip = subclip.resize(width=1080)
             
