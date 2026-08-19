@@ -3,4 +3,4 @@ moviepy==1.0.3
 proglog
 imageio
 imageio-ffmpeg
-pillow
+Pillow<10.0.0
